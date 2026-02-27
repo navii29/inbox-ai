@@ -1,0 +1,68 @@
+name: Inbox AI — Scheduled Email Processing
+
+on:
+  schedule:
+    # Runs every 10 minutes during business hours (Mon–Fri, 7am–7pm UTC)
+    - cron: '*/10 7-19 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Processing mode'
+        required: true
+        default: 'monitor'
+        type: choice
+        options:
+          - monitor
+          - hybrid
+          - auto
+
+jobs:
+  process-inbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Create config from secrets
+        run: |
+          mkdir -p ~/.openclaw/workspace
+          cat > ~/.openclaw/workspace/inbox-ai-config.env << EOF
+          IMAP_SERVER=${{ secrets.IMAP_SERVER }}
+          IMAP_PORT=${{ secrets.IMAP_PORT }}
+          SMTP_SERVER=${{ secrets.SMTP_SERVER }}
+          SMTP_PORT=${{ secrets.SMTP_PORT }}
+          EMAIL_USERNAME=${{ secrets.EMAIL_USERNAME }}
+          EMAIL_PASSWORD=${{ secrets.EMAIL_PASSWORD }}
+          FROM_NAME=${{ secrets.FROM_NAME }}
+          AUTO_REPLY_ENABLED=${{ secrets.AUTO_REPLY_ENABLED }}
+          ESCALATION_THRESHOLD=${{ secrets.ESCALATION_THRESHOLD }}
+          SUMMARY_LANGUAGE=${{ secrets.SUMMARY_LANGUAGE }}
+          MAX_AUTO_REPLY_PER_HOUR=${{ secrets.MAX_AUTO_REPLY_PER_HOUR }}
+          CALENDLY_LINK=${{ secrets.CALENDLY_LINK }}
+          ESCALATION_PHONE=${{ secrets.ESCALATION_PHONE }}
+          AUTO_ARCHIVE=${{ secrets.AUTO_ARCHIVE }}
+          WORKING_HOURS_START=08:00
+          WORKING_HOURS_END=18:00
+          WORKING_DAYS=mon,tue,wed,thu,fri
+          EOF
+
+      - name: Run Inbox AI
+        run: |
+          MODE="${{ github.event.inputs.mode || 'auto' }}"
+          echo "Running in $MODE mode..."
+          python3 scripts/inbox_processor.py --mode=$MODE
+
+      - name: Upload processing log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: inbox-ai-log-${{ github.run_id }}
+          path: ~/inbox-ai-logs/
+          retention-days: 30

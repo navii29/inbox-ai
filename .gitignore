@@ -1,0 +1,21 @@
+# NEVER commit credentials
+*.env
+!*.template.env
+inbox-ai-config.env
+
+# Logs
+*.log
+inbox-ai-logs/
+/tmp/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.Python
+venv/
+.env
+
+# OS
+.DS_Store
+Thumbs.db
