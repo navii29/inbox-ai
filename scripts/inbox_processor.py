@@ -29,8 +29,22 @@ def load_config():
                     config[key.strip()] = value.strip()
     return config
 
+def safe_int(value, default):
+    """Convert to int safely — returns default if value is empty, None, or non-numeric."""
+    try:
+        return int(str(value).strip()) if str(value).strip() else default
+    except (ValueError, TypeError):
+        return default
+
+
+def safe_float(value, default):
+    """Convert to float safely — returns default if value is empty, None, or non-numeric."""
+    try:
+        return float(str(value).strip()) if str(value).strip() else default
+    except (ValueError, TypeError):
+        return default
 def connect_imap(config):
-    imap = imaplib.IMAP4_SSL(config['IMAP_SERVER'], int(config.get('IMAP_PORT', 993)))
+    imap = imaplib.IMAP4_SSL(config['IMAP_SERVER'], safe_int(config.get('IMAP_PORT'), 993))
     imap.login(config['EMAIL_USERNAME'], config['EMAIL_PASSWORD'])
     return imap
 
@@ -80,7 +94,7 @@ def should_auto_reply(category, priority, requires_escalation, config):
         return False
     if requires_escalation or category == 'spam':
         return False
-    if priority > float(config.get('ESCALATION_THRESHOLD', 0.7)):
+    if priority > safe_float(config.get('ESCALATION_THRESHOLD'), 0.7):
         return False
     return True
 
@@ -117,7 +131,7 @@ def send_reply(to_email, subject, body, in_reply_to, config):
         msg['References'] = in_reply_to
     msg.attach(MIMEText(body, 'plain', 'utf-8'))
     context = ssl.create_default_context()
-    with smtplib.SMTP(config['SMTP_SERVER'], int(config.get('SMTP_PORT', 587))) as server:
+    with smtplib.SMTP(config['SMTP_SERVER'], safe_int(config.get('SMTP_PORT'), 587)) as server:
         server.ehlo()
         server.starttls(context=context)
         server.ehlo()
@@ -156,7 +170,7 @@ def process_emails(mode='monitor'):
 
         processed = []
         reply_count = 0
-        max_replies = int(config.get('MAX_AUTO_REPLY_PER_HOUR', 20))
+        max_replies = safe_int(config.get('MAX_AUTO_REPLY_PER_HOUR'), 20)
 
         for email_id in email_ids:
             try:
@@ -191,7 +205,7 @@ def process_emails(mode='monitor'):
                     print(f"  ✓ Replied [{category}]: {subject[:50]}")
                     if config.get('AUTO_ARCHIVE', 'true').lower() == 'true':
                         imap.store(email_id, '+FLAGS', '\\Seen')
-                elif escalate or priority > float(config.get('ESCALATION_THRESHOLD', 0.7)):
+                elif escalate or priority > safe_float(config.get('ESCALATION_THRESHOLD'), 0.7):
                     result['action'] = 'escalated'
                     print(f"  ⚠ Escalated [{category}]: {subject[:50]}")
                 elif category == 'spam':
